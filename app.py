@@ -2,10 +2,13 @@
 # -*- coding: utf-8 -*-
 """
 HR Analytics Streamlit Dashboard
-Author : Jaideep (GMBA) — aided by ChatGPT o3
-Created : 2025-07-03
+Author  : Jaideep (GMBA) — aided by ChatGPT o3
+Updated : 2025-07-03  (constant-column slider fix)
 """
 
+# ---------------------------------------------------------------------
+# Imports
+# ---------------------------------------------------------------------
 import warnings, base64
 from pathlib import Path
 from typing import List, Tuple, Dict
@@ -34,7 +37,7 @@ from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.linear_model import LinearRegression, Ridge, Lasso, LogisticRegression
 from sklearn.cluster import KMeans
 from mlxtend.frequent_patterns import apriori, association_rules
-import xgboost as xgb
+import xgboost as xgb  # fixed alias
 
 warnings.filterwarnings("ignore", category=FutureWarning)
 st.set_page_config(page_title="HR Analytics Dashboard",
@@ -73,15 +76,31 @@ def universal_filters(df: pd.DataFrame) -> pd.DataFrame:
     numeric, categorical = get_column_types(df)
     df_filt = df.copy()
 
+    # ---------------- Numeric sliders (with constant-value guard) -----
     with st.sidebar.expander("Numeric Ranges"):
         for col in numeric:
+            min_val, max_val = df[col].min(), df[col].max()
+
+            # Constant column ➜ show disabled number_input instead of slider
+            if min_val == max_val:
+                st.number_input(
+                    col,
+                    value=float(min_val),
+                    help=f"{col} is constant ({min_val}) — no filter needed",
+                    disabled=True,
+                )
+                continue  # skip filtering for this column
+
             lo, hi = st.slider(
-                col, float(df[col].min()), float(df[col].max()),
-                (float(df[col].min()), float(df[col].max())),
+                col,
+                float(min_val),
+                float(max_val),
+                (float(min_val), float(max_val)),
                 help=f"Filter {col}",
             )
             df_filt = df_filt[(df_filt[col] >= lo) & (df_filt[col] <= hi)]
 
+    # ---------------- Categorical multiselects ------------------------
     with st.sidebar.expander("Categorical Values"):
         for col in categorical:
             opts = df[col].dropna().unique().tolist()
@@ -393,8 +412,8 @@ def tab_retention(df: pd.DataFrame):
     elif alg == "Random Forest":
         mdl = RandomForestClassifier(
             n_estimators=400, random_state=RANDOM_STATE)
-    else:
-        mdl = xgboost.XGBClassifier(
+    else:  # XGBoost
+        mdl = xgb.XGBClassifier(
             random_state=RANDOM_STATE, eval_metric="logloss",
             n_estimators=500, learning_rate=0.05, max_depth=5,
         )
