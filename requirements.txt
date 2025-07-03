@@ -5,4 +5,4 @@ scikit-learn
 plotly
 mlxtend
 shap
-pytest
+xgboost
